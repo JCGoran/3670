@@ -1,0 +1,107 @@
+/*--------------------------------------------------------------
+	TEMPLATE FILE FOR DEFINING RETICULAR NEURONS
+	--------------------------------------------
+
+	. ONE COMPARTMENT (soma)
+
+	. CURRENTS:
+		- passive
+		- IT2: Huguenard Nernst, shift=2
+		- IAHP: Destexhe; min time constant of 0.1 ms
+		- ICAN: Destexhe; min time constant of 0.1 ms
+		- Ca++ pump & decay
+
+Reference:
+
+Destexhe, A., Contreras, D., Sejnowski, T.J. and Steriade, M.  A model of
+spindle rhythmicity in the isolated reticular thalamus. Journal of 
+Neurophysiology 72: 803-818, 1994.
+
+See also:
+
+  http://www.cnl.salk.edu/~alain
+  http://cns.fmed.ulaval.ca
+
+
+	Alain Destexhe, Salk Institute, May 1993
+
+--------------------------------------------------------------*/
+
+
+print " "
+print " << defining template for one-compartment RE cell >> "
+print " "
+
+
+begintemplate REcell		// create a new template object...
+public soma
+create soma
+
+proc init() { local v_potassium, v_sodium
+
+  v_potassium = -95	// potassium reversal potential
+  v_sodium = 50		// sodium reversal potential
+
+  soma {
+	Ra = 100		// geometry
+	nseg = 1
+	diam = 10
+	L = 31.831  		// such as surface = 1000 um2
+
+	insert pas		// leak current
+	e_pas = -78
+	g_pas = 0.00005		// time constant is 20 ms
+
+	insert hh2		// Hodgin-Huxley INa and IK
+	ek = v_potassium
+	ena = v_sodium
+	vtraub_hh2 = -55
+	gnabar_hh2 = 0.1
+	gkbar_hh2 = 0.01
+
+	insert it2 		// reticular IT current
+	cai = 2.4e-4 
+	cao = 2 
+	eca = 120 
+	shift_it2 = 2
+	gcabar_it2 = 0.00175
+
+	insert iahp		// burst IAHP
+	cac_iahp = 0.025
+	beta_iahp = 0.03
+	taumin_iahp = 0.1
+	ek=v_potassium
+	gkbar_iahp = 0.01
+
+	insert ican 		// nonspecific cation current ICAN
+	cac_ican = 0.01
+	beta_ican = 0.002
+	taumin_ican = 0.1
+	en=-20
+	gbar_ican = 0.00025
+
+	insert cad		// calcium pump
+	kd_cad = 1e-4
+	kt_cad = 1e-4
+	depth_cad = 1
+	taur_cad = 1e10
+  }
+
+  print " "
+  print "<< REcell: passive, INa, IK, IT, IAHP, ICAN and calcium pump inserted >>"
+  print " "
+
+}
+endtemplate REcell
+
+
+
+
+// redefine init procedure with cai initialized
+
+proc init() {
+	finitialize(v_init)
+	forall { cai = 2.4e-4 }
+	fcurrent()
+}
+

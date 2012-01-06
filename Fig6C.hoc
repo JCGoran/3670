@@ -1,0 +1,250 @@
+/*----------------------------------------------------------------------------
+
+	demo file
+	---------
+
+	Simulations of networks using the object-oriented ability of NEURON
+
+	5 neurons connected with GABA-A synapses
+	Second-neighbor connections along a ring:
+	(every cell connects all the others, except itself)
+
+        cell1 - cell2
+          |      |
+        cell3  cell4      
+           \   /
+           cell5
+
+	Idem Fig.6C of the J Neurophysiol. paper
+
+
+WARNING: to obtain patterns similar to Fig6c, use a max stimulation
+amplitude of -0.02 nA and 20000 as simulation time...
+
+
+
+Reference:
+
+Destexhe, A., Contreras, D., Sejnowski, T.J. and Steriade, M.  A model of
+spindle rhythmicity in the isolated reticular thalamus. Journal of 
+Neurophysiology 72: 803-818, 1994.
+
+See also:
+
+  http://www.cnl.salk.edu/~alain
+  http://cns.fmed.ulaval.ca
+
+----------------------------------------------------------------------------*/
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  load and define general graphical procedures
+//----------------------------------------------------------------------------
+
+//xopen("$(NEURONHOME)/lib/hoc/stdrun.hoc")
+
+objectvar g[20]			// max 20 graphs
+ngraph = 0
+
+proc addgraph() { local ii	// define subroutine to add a new graph
+				// addgraph("variable", minvalue, maxvalue)
+	ngraph = ngraph+1
+	ii = ngraph-1
+	g[ii] = new Graph()
+	g[ii].size(0,tstop,$2,$3)
+	g[ii].xaxis()
+	g[ii].yaxis()
+	g[ii].addvar($s1,1,0)
+	g[ii].save_name("graphList[0].")
+	graphList[0].append(g[ii])
+}
+
+if(ismenu==0) {
+  nrnmainmenu()			// create main menu
+  nrncontrolmenu()		// create control menu
+  ismenu=1
+}
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  general parameters
+//----------------------------------------------------------------------------
+
+dt=0.1
+tstop = 5000
+runStopAt = tstop
+steps_per_ms = 5
+celsius = 36
+v_init = -70
+
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  create cells
+//----------------------------------------------------------------------------
+
+load_file("RE.tem")			// load template for RE cell
+
+ncells = 5				// sets the number of cells
+
+objectvar RE[ncells]			// create an array of object variables
+
+for(i=0; i<ncells; i=i+1) {
+  RE[i] = new REcell()			// create RE cells from template
+}
+
+
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  create connections
+//----------------------------------------------------------------------------
+
+print " "
+print " << Defining connectivity ... >>"
+print " "
+
+// The connectivity is defined here in a 1-dim ring of neurons;
+// each neuron is connected to its neighbors according to a mininal (layer_min)
+// and a maximal (layer_max) distance. 
+
+layer_min = 1				// first neighbors
+layer_max = 2
+
+neighmax = 1 + 2 * layer_max		// cells in neighborhood
+neighmin = 1 + 2 * (layer_min-1)	// cells not in neighborhood
+if(layer_min == 0) neighmin = 0
+neigh = neighmax-neighmin		// nb of cells connected
+
+print " "
+print " << Number of synapses per cell: ",neigh," >>"
+print " "
+
+objectvar syn[ncells][neigh]		// create object variables for synapses
+
+for(i=0; i<ncells; i=i+1) {		// scan over each cell
+  ns = 0
+  for(k=(i-layer_max); k<(i+layer_max+1); k=k+1) {	// scan over postsyn
+
+
+
+	if(k < 0) {			// boundaries = PERIODIC
+		j = ncells + k 
+	} else if(k >= ncells) {
+		j = k - ncells
+	} else {
+		j = k
+	}
+
+
+	dis = abs(i-k)
+
+	if( (dis >= layer_min) && (dis <= layer_max) ) {  // distance OK?
+
+	  print "<< GABA synapse from cell ",i," to cell ",j," >>"
+	  syn[i][ns] = new GABA()
+
+	  RE[j].soma syn[i][ns].loc(0.5)		// j is postsynaptic
+	  setpointer syn[i][ns].pre, RE[i].soma.v(0.5)	// i is presynaptic
+
+	  ns = ns + 1			// update synapse counter
+	}
+
+  }
+}
+print " "
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  create procedure for setting the synaptic weights
+//----------------------------------------------------------------------------
+
+proc assign_synapses() {		// assign a value to all synapses
+  for(i=0; i<ncells; i=i+1) {		// scan over each cell
+    for(j=0; j<neigh; j=j+1) {		// scan over each connection
+  	  syn[i][j].gmax = $1		// assign value of gmax
+    }
+  }
+}
+
+
+assign_synapses(0.25)			// assign value (in uS) to each synapse
+					// sum of all synapses 1ust be of 1uS 
+					// for each cell
+
+
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  insert random current pulse in each neuron
+//----------------------------------------------------------------------------
+
+objectvar RG,Pulse[ncells]			// create object variables
+
+RG = new Random()				// create random generator
+
+for (i=0; i<ncells; i=i+1) {
+	print "defining current pulse in RE[",i,"]"
+
+	RE[i].soma Pulse[i] = new IClamp(.5)		// create current stim
+// note: for older versions of NEURON, please use PulseStim instead of IClamp
+
+	Pulse[i].dur = 200				// fixed duration
+	Pulse[i].amp = RG.uniform(0,-0.02)		// random amplitude
+	Pulse[i].del = RG.uniform(0,2000)		// random latency
+}
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  add graphs
+//----------------------------------------------------------------------------
+
+print " "
+print " << Creating graphics ... >>"
+print " "
+
+for(i=0; i<ncells; i=i+1) {
+    addgraph("RE[i].soma.v(0.5)",-100,20)
+}
+
+
+
+
+
+

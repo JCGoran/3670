@@ -1,0 +1,77 @@
+//----------------------------------------------------------------------------
+//  define a panel to run the different demos
+//----------------------------------------------------------------------------
+
+proc make_demopanel() {
+	xpanel("Simulations of thalamic reticular network")
+	xlabel("Simulations of thalamic reticular network")
+	xbutton("Fig. 5a","restart(\"Fig5A\")")
+	xbutton("Fig. 5b","restart(\"Fig5B\")")
+        xbutton("Fig. 6a","restart(\"Fig6A\")")
+        xbutton("Fig. 6b","restart(\"Fig6B\")")
+	xbutton("Fig. 6c","restart(\"Fig6C\")")
+	xbutton("Fig. 6d","restart(\"Fig6D\")")
+        xbutton("Fig. 13a","restart(\"Fig13A\")")
+	xbutton("Fig. 13b","restart(\"Fig13B\")")
+	xpanel(5,100)
+}
+
+
+load_file("nrngui.hoc")
+
+objref pwman
+pwman = new PWManager()
+
+proc rm_panel() {
+	pwman.hide(1)
+}
+
+make_demopanel()
+
+ismenu=0
+
+//----------------------------------------------------------------------------
+//  define a panel to run the different demos
+//----------------------------------------------------------------------------
+
+load_file("nrngui.hoc")
+
+strdef tstr
+
+objref El
+
+electrodes_present=0	// after electrodes are created they must be
+			// destroyed if simulation restarted
+
+proc destroy_elec() {
+	execute("objref stim, vc",El)
+}
+
+pwmcnt = PWManager[0].count  // the initial GUIs should not be dismissed
+ismenu=0		// determines if electrode is defined
+
+
+proc restart() { local i
+	if (electrodes_present) {
+		destroy_elec()
+	}
+
+	forall delete_section()
+
+	for i=0, n_graph_lists-1 {
+		graphList[i].remove_all()
+	}
+	flush_list.remove_all()
+	fast_flush_list.remove_all()
+	doNotify()
+	for (i= PWManager[0].count-1; i >= pwmcnt; i -= 1) {
+		PWManager[0].close(i)
+		doNotify()
+	}
+	stoprun = 0
+	cvode_active(0)
+	
+	sprint(tstr, "%s.hoc", $s1)
+	load_file(1, tstr)
+	ismenu=0	// used to reopen run control window
+}

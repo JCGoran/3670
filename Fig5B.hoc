@@ -1,0 +1,214 @@
+/*----------------------------------------------------------------------------
+
+	demo file
+	---------
+
+	Simulations of networks using the object-oriented ability of NEURON
+
+	2 neurons reciprocally connected with GABA-A synapses
+	+ self-connections
+
+	Idem Fig.5B of the J Neurophysiol. paper
+
+
+
+Reference:
+
+Destexhe, A., Contreras, D., Sejnowski, T.J. and Steriade, M.  A model of
+spindle rhythmicity in the isolated reticular thalamus. Journal of 
+Neurophysiology 72: 803-818, 1994.
+
+See also:
+
+  http://www.cnl.salk.edu/~alain
+  http://cns.fmed.ulaval.ca
+
+----------------------------------------------------------------------------*/
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  load and define general graphical procedures
+//----------------------------------------------------------------------------
+
+//xopen("$(NEURONHOME)/lib/hoc/stdrun.hoc")
+
+objectvar g[20]			// max 20 graphs
+ngraph = 0
+
+proc addgraph() { local ii	// define subroutine to add a new graph
+				// addgraph("variable", minvalue, maxvalue)
+	ngraph = ngraph+1
+	ii = ngraph-1
+	g[ii] = new Graph()
+	g[ii].size(0,tstop,$2,$3)
+	g[ii].xaxis()
+	g[ii].yaxis()
+	g[ii].addvar($s1,1,0)
+	g[ii].save_name("graphList[0].")
+	graphList[0].append(g[ii])
+}
+
+if(ismenu==0) {
+  nrnmainmenu()			// create main menu
+  nrncontrolmenu()		// create control menu
+  ismenu=1
+}
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  general parameters
+//----------------------------------------------------------------------------
+
+dt=0.1
+tstop = 5000
+runStopAt = tstop
+steps_per_ms = 5
+celsius = 36
+v_init = -70
+
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  create cells
+//----------------------------------------------------------------------------
+
+load_file("RE.tem")			// load template for RE cell
+
+ncells = 2				// sets the number of cells
+
+objectvar RE[ncells]			// create an array of object variables
+
+for(i=0; i<ncells; i=i+1) {
+  RE[i] = new REcell()			// create RE cells from template
+}
+
+
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  create connections
+//----------------------------------------------------------------------------
+
+
+neigh = 2				// number of neighbors connected 
+					// neigh=1 interconnections
+					// neigh=2 idem + self synapse
+
+objectvar syn[ncells][ncells]		// create object variables for synapses
+
+for(i=0; i<ncells; i=i+1) {		// scan over each pair of cells
+  nv = 0
+  for(j=0; j<ncells; j=j+1) {
+     if( (i==j) && (neigh==1) ) {
+	print "<< no self synapse in cell ",i," >>"
+     } else {
+	print "<< GABA synapse number ",nv," from cell ",i," to cell ",j," >>"
+	syn[i][nv] = new GABA()
+					// postsynaptic is soma of RE[j]
+	RE[j].soma syn[i][nv].loc(0.5)
+
+					// presynaptic  is soma of RE[i]
+	setpointer syn[i][nv].pre, RE[i].soma.v(0.5)
+	nv = nv + 1
+     }
+  }
+}
+
+print " "
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  create procedure for setting the synaptic weights
+//----------------------------------------------------------------------------
+
+proc assign_synapses() {		// assign a value to all synapses
+  for(i=0; i<ncells; i=i+1) {		// scan over each cell
+    for(j=0; j<neigh; j=j+1) {		// scan over each connection
+  	  syn[i][j].gmax = $1		// assign value of gmax
+    }
+  }
+}
+
+
+assign_synapses(0.5)			// assign value (in uS) to each synapse
+					// sum of all synapses 1ust be of 1uS 
+					// for each cell
+
+
+
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  insert random current pulse in each neuron
+//----------------------------------------------------------------------------
+
+objectvar RG,Pulse[ncells]			// create object variables
+
+RG = new Random()				// create random generator
+
+for (i=0; i<ncells; i=i+1) {
+	print "defining current pulse in RE[",i,"]"
+
+	RE[i].soma Pulse[i] = new IClamp(.5)		// create current stim
+// note: for older versions of NEURON, please use PulseStim instead of IClamp
+
+	Pulse[i].dur = 200				// fixed duration
+	Pulse[i].amp = RG.uniform(0,-0.05)		// random amplitude
+	Pulse[i].del = RG.uniform(0,2000)		// random latency
+}
+
+
+
+
+
+
+
+//----------------------------------------------------------------------------
+//  add graphs
+//----------------------------------------------------------------------------
+
+print " "
+print " << Creating graphics ... >>"
+print " "
+
+for(i=0; i<ncells; i=i+1) {
+    addgraph("RE[i].soma.v(0.5)",-100,20)
+}
+
+
+
+
+
+
